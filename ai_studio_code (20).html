@@ -82,9 +82,8 @@
 
     <div class="container">
         <div class="controls">
-            <!-- NEW: Load from Server Button -->
             <button id="load-from-server-btn" data-i18n-key="btnLoadServer">Load from Site</button>
-            <button id="zoom-fit-btn" data-i18n-key="btnZoom">Maximize Window</button>
+            <button id="zoom-fit-btn" data-i18n-key="btnFullscreen"></button>
             <button id="toggle-keys-btn"></button>
         </div>
         <div id="key-config-controls">
@@ -126,7 +125,6 @@
         </div>
     </div>
     
-    <!-- NEW: Game List Modal -->
     <div id="game-list-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 data-i18n-key="gameListTitle">Select a Game</h3>
@@ -143,57 +141,12 @@
         window.RufflePlayer = window.RufflePlayer || {};
         window.RufflePlayer.config = { "publicPath": "https://unpkg.com/@ruffle-rs/ruffle", "scale": "exactFit", "quality": "high" };
 
-        // --- IMPORTANT: Manually list your SWF files here ---
-        // Make sure these files are in the same directory as this HTML file on your server.
-        const GAME_FILES = [
-            '13929.swf',
-            'another_game.swf',
-            '2.swf',
-            'another_game.swf',
-            '3.swf',
-            'another_game.swf',
-            '4.swf',
-            'another_game.swf',
-            '1.swf',
-            'another_game.swf',
-            '5.swf',
-            'another_game.swf',
-            '6.swf',
-            'another_game.swf',
-            '7.swf',
-            'another_game.swf',
-            '8.swf',
-            'another_game.swf',
-            '9.swf',
-            'another_game.swf',
-            '10.swf',
-            'another_game.swf',
-            '11.swf',
-            'another_game.swf',
-            '12.swf',
-            'another_game.swf',
-            '13.swf',
-            'another_game.swf',
-            '14.swf',
-            'another_game.swf',
-            '15.swf',
-            'another_game.swf',
-            '16.swf',
-            'another_game.swf',
-            '17.swf',
-            'another_game.swf',
-            '18.swf',
-            'another_game.swf',
-            '19.swf',
-            'another_game.swf',
-            '20.swf'
-        ];
-
+        // REVISED: Renamed zoom-related keys to be more generic 'fullscreen'
         const translations = {
-            en: { pageTitle: "Ruffle Flash Player", uploadPrompt: "Drag & Drop SWF File or Click to Select", btnLoadServer: "Load from Site", btnZoom: "Maximize", btnZoomRestore: "Restore", btnToggleShow: "Expand Keys", btnToggleHide: "Collapse Keys", configTitle: "Configure Keys", modalTitle: "Select a Key", btnClear: "Clear", btnExit: "Exit", btnPresetCancel: "Cancel", alertNoSwf: "Load a SWF file first!", btnDPadPreset: "D-Pad Presets", presetModalTitle: "Select D-Pad Preset", presetArrows: "Set to ↑↓←→", presetWSAD: "Set to WSAD", toastExitZoom: "Press Esc or Back to exit.", gameListTitle: "Select a Game" },
-            'zh-TW': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或點擊選擇 SWF 檔案", btnLoadServer: "從網站載入遊戲", btnZoom: "視窗最大化", btnZoomRestore: "還原視窗", btnToggleShow: "展開按鍵", btnToggleHide: "收起按鍵", configTitle: "設定各按鍵功能", modalTitle: "選擇一個按鍵", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "請先載入一個 SWF 檔案！", btnDPadPreset: "方向鍵常用設定", presetModalTitle: "選擇方向鍵預設", presetArrows: "設定為 ↑↓←→", presetWSAD: "設定為 WSAD", toastExitZoom: "按 Esc 或返回鍵可退出最大化。", gameListTitle: "選擇一個遊戲" },
-            'zh-CN': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或点击选择 SWF 文件", btnLoadServer: "从网站加载游戏", btnZoom: "窗口最大化", btnZoomRestore: "还原窗口", btnToggleShow: "展开按键", btnToggleHide: "收起按键", configTitle: "设置各按键功能", modalTitle: "选择一个按键", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "请先加载一个 SWF 文件！", btnDPadPreset: "方向键常用设置", presetModalTitle: "选择方向键预设", presetArrows: "设置为 ↑↓←→", presetWSAD: "设置为 WSAD", toastExitZoom: "按 Esc 或返回键可退出最大化。", gameListTitle: "选择一个游戏" },
-            ja: { pageTitle: "Ruffle Flash プレーヤー", uploadPrompt: "SWFファイルをドラッグ＆ドロップまたはクリックして選択", btnLoadServer: "サイトから読込", btnZoom: "ウィンドウ最大化", btnZoomRestore: "ウィンドウを元に戻す", btnToggleShow: "キーを展開", btnToggleHide: "キーを折りたたむ", configTitle: "各キーの機能を設定", modalTitle: "キーを選択", btnClear: "クリア", btnExit: "閉じる", btnPresetCancel: "キャンセル", alertNoSwf: "先にSWFファイルを読み込んでください！", btnDPadPreset: "方向キーのプリセット", presetModalTitle: "方向キーのプリセットを選択", presetArrows: "↑↓←→ に設定", presetWSAD: "WSAD に設定", toastExitZoom: "Escキーまたは戻るボタンで元に戻せます。", gameListTitle: "ゲームを選択" }
+            en: { pageTitle: "Ruffle Flash Player", uploadPrompt: "Drag & Drop SWF File or Click to Select", btnLoadServer: "Load from Site", btnFullscreen: "Fullscreen Mode", btnFullscreenRestore: "Exit Fullscreen", btnToggleShow: "Expand Virtual Keys", btnToggleHide: "Collapse Virtual Keys", configTitle: "Configure Keys", modalTitle: "Select a Key", btnClear: "Clear", btnExit: "Exit", btnPresetCancel: "Cancel", alertNoSwf: "Load a SWF file first!", btnDPadPreset: "D-Pad Presets", presetModalTitle: "Select D-Pad Preset", presetArrows: "Set to ↑↓←→", presetWSAD: "Set to WSAD", toastExitZoom: "Press Esc or Back to exit.", gameListTitle: "Select a Game" },
+            'zh-TW': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或點擊選擇 SWF 檔案", btnLoadServer: "從網站載入遊戲", btnFullscreen: "全螢幕模式", btnFullscreenRestore: "退出全螢幕", btnToggleShow: "展開虛擬按鍵", btnToggleHide: "收起虛擬按鍵", configTitle: "設定各按鍵功能", modalTitle: "選擇一個按鍵", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "請先載入一個 SWF 檔案！", btnDPadPreset: "方向鍵常用設定", presetModalTitle: "選擇方向鍵預設", presetArrows: "設定為 ↑↓←→", presetWSAD: "設定為 WSAD", toastExitZoom: "按 Esc 或返回鍵可退出。", gameListTitle: "選擇一個遊戲" },
+            'zh-CN': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或点击选择 SWF 文件", btnLoadServer: "从网站加载游戏", btnFullscreen: "全屏模式", btnFullscreenRestore: "退出全屏", btnToggleShow: "展开虚拟按键", btnToggleHide: "收起虚拟按键", configTitle: "设置各按键功能", modalTitle: "选择一个按键", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "请先加载一个 SWF 文件！", btnDPadPreset: "方向键常用设置", presetModalTitle: "选择方向键预设", presetArrows: "设置为 ↑↓←→", presetWSAD: "设置为 WSAD", toastExitZoom: "按 Esc 或返回键可退出。", gameListTitle: "选择一个游戏" },
+            ja: { pageTitle: "Ruffle Flash プレーヤー", uploadPrompt: "SWFファイルをドラッグ＆ドロップまたはクリックして選択", btnLoadServer: "サイトから読込", btnFullscreen: "全画面表示モード", btnFullscreenRestore: "全画面表示を終了", btnToggleShow: "仮想キーを展開", btnToggleHide: "仮想キーを折りたたむ", configTitle: "各キーの機能を設定", modalTitle: "キーを選択", btnClear: "クリア", btnExit: "閉じる", btnPresetCancel: "キャンセル", alertNoSwf: "先にSWFファイルを読み込んでください！", btnDPadPreset: "方向キーのプリセット", presetModalTitle: "方向キーのプリセットを選択", presetArrows: "↑↓←→ に設定", presetWSAD: "WSAD に設定", toastExitZoom: "Escキーまたは戻るボタンで元に戻せます。", gameListTitle: "ゲームを選択" }
         };
         const KEY_LIST_I18N = {
             en: { "Common Controls": [ { name: "Space", value: " " }, { name: "Enter", value: "Enter" }, { name: "Escape", value: "Escape" }, { name: "Shift", value: "Shift" }, { name: "Control", value: "Control" }, { name: "Alt", value: "Alt" } ], "Letters": "abcdefghijklmnopqrstuvwxyz".split('').map(k => ({ name: k.toUpperCase(), value: k })), "Numbers": "0123456789".split('').map(k => ({ name: k, value: k })), "Function Keys": Array.from({length: 12}, (_, i) => ({ name: `F${i+1}`, value: `F${i+1}` })), "Other": [ { name: "Tab", value: "Tab" }, { name: "Backspace", value: "Backspace" }, { name: "Insert", value: "Insert" } ] },
@@ -210,12 +163,12 @@
         function setLanguage(lang) {
             currentLanguage = lang; document.documentElement.lang = lang; localStorage.setItem('preferredLanguage', lang);
             document.querySelectorAll('[data-i18n-key]').forEach(el => { const key = el.dataset.i18nKey; if (translations[lang][key]) el.textContent = translations[lang][key]; });
-            updateToggleKeysButtonText(); updateZoomFitButtonText();
+            updateToggleKeysButtonText(); updateFullscreenButtonText();
             document.querySelectorAll('.language-switcher button').forEach(btn => { btn.classList.toggle('active', btn.dataset.lang === lang); });
             populateKeySelector();
         }
         function updateToggleKeysButtonText() { allDOMElements.toggleKeysBtn.textContent = areKeysVisible ? translations[currentLanguage].btnToggleHide : translations[currentLanguage].btnToggleShow; }
-        function updateZoomFitButtonText() { allDOMElements.zoomFitBtn.textContent = isZoomed ? translations[currentLanguage].btnZoomRestore : translations[currentLanguage].btnZoom; }
+        function updateFullscreenButtonText() { allDOMElements.zoomFitBtn.textContent = isZoomed ? translations[currentLanguage].btnFullscreenRestore : translations[currentLanguage].btnFullscreen; }
         
         function saveKeyMappings() { localStorage.setItem('ruffleKeyMappings', JSON.stringify(keyMappings)); }
         function loadKeyMappings() { const saved = localStorage.getItem('ruffleKeyMappings'); keyMappings = saved ? JSON.parse(saved) : { ...defaultKeyMappings }; updateAllVirtualKeyText(); }
@@ -257,21 +210,21 @@
             toastTimer = setTimeout(() => { toast.classList.remove('toast-visible'); }, 3500);
         }
 
-        function toggleZoomFit() {
+        function toggleFullscreen() {
             isZoomed = !isZoomed;
             if (isZoomed) {
                 const ratio = 4 / 3, vpW = window.innerWidth, vpH = window.innerHeight; let newW, newH;
                 if (vpW / vpH > ratio) { newH = vpH; newW = newH * ratio; } else { newW = vpW; newH = newW / ratio; }
                 allDOMElements.flashContainer.style.width = `${newW}px`; allDOMElements.flashContainer.style.height = `${newH}px`;
                 allDOMElements.flashContainer.classList.add('zoomed-to-fit'); allDOMElements.body.classList.add('zoomed-mode-active');
-                history.pushState({ zoom: true }, "Zoom Mode");
+                history.pushState({ zoom: true }, "Fullscreen Mode");
                 showToast('toastExitZoom');
             } else {
                 allDOMElements.flashContainer.removeAttribute('style');
                 allDOMElements.flashContainer.classList.remove('zoomed-to-fit'); allDOMElements.body.classList.remove('zoomed-mode-active');
                 if (history.state?.zoom) history.back();
             }
-            updateZoomFitButtonText();
+            updateFullscreenButtonText();
         }
         
         function applyDPadPreset(type) {
@@ -307,16 +260,18 @@
                 });
             });
         }
+        // REVISED: Auto-generate game list from 1 to 99
         function populateGameList() {
             const container = allDOMElements.gameListContainer;
             container.innerHTML = '';
-            GAME_FILES.forEach(filename => {
+            for (let i = 1; i <= 99; i++) {
+                const filename = `${i}.swf`;
                 const item = document.createElement('div');
                 item.className = 'game-item';
                 item.textContent = filename;
                 item.dataset.filename = filename;
                 container.appendChild(item);
-            });
+            }
         }
 
         allDOMElements.uploadArea.addEventListener('click', () => allDOMElements.fileInput.click());
@@ -341,7 +296,7 @@
         document.querySelectorAll('.virtual-key').forEach(key => { ['mousedown', 'touchstart'].forEach(evt => key.addEventListener(evt, e => { e.preventDefault(); handleKeyPress(e, 'keydown'); }, { passive: false })); ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(evt => key.addEventListener(evt, e => { e.preventDefault(); handleKeyPress(e, 'keyup'); }, { passive: false })); });
         
         allDOMElements.langSwitcher.addEventListener('click', e => { if (e.target.dataset.lang) setLanguage(e.target.dataset.lang); });
-        allDOMElements.zoomFitBtn.addEventListener('click', toggleZoomFit);
+        allDOMElements.zoomFitBtn.addEventListener('click', toggleFullscreen);
         allDOMElements.toggleKeysBtn.addEventListener('click', () => { areKeysVisible = !areKeysVisible; allDOMElements.dpadContainer.classList.toggle('keys-hidden', !areKeysVisible); allDOMElements.numpadContainer.classList.toggle('keys-hidden', !areKeysVisible); updateToggleKeysButtonText(); });
         
         allDOMElements.keyConfigButtonsContainer.addEventListener('click', e => { const btn = e.target.closest('button'); if (btn && btn.dataset.keyId) { currentConfigKeyId = btn.dataset.keyId; allDOMElements.keyConfigModal.style.display = 'flex'; } });
@@ -364,8 +319,8 @@
             }
         });
 
-        window.addEventListener('keydown', e => { if (e.key === 'Escape' && isZoomed) toggleZoomFit(); });
-        window.addEventListener('popstate', () => { if (document.fullscreenElement) document.exitFullscreen(); if (isZoomed) toggleZoomFit(); });
+        window.addEventListener('keydown', e => { if (e.key === 'Escape' && isZoomed) toggleFullscreen(); });
+        window.addEventListener('popstate', () => { if (document.fullscreenElement) document.exitFullscreen(); if (isZoomed) toggleFullscreen(); });
         
         initialize();
     </script>

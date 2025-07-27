@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ruffle Flash Player with Virtual Keys</title>
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+    <style>
+        :root { --key-size: 50px; --key-gap: 10px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0; padding: 10px; display: flex; flex-direction: column;
+            align-items: center; background-color: #f0f2f5; color: #333;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body.zoomed-mode-active > .language-switcher,
+        body.zoomed-mode-active > h1,
+        body.zoomed-mode-active > .upload-area,
+        body.zoomed-mode-active > .container > .controls,
+        body.zoomed-mode-active > .container > #key-config-controls { display: none; }
+
+        .language-switcher { margin-bottom: 10px; display: flex; gap: 5px; }
+        .language-switcher button { padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; }
+        .language-switcher button.active { background-color: #007aff; color: white; border-color: #007aff; }
+
+        h1 { text-align: center; font-size: 1.5em; }
+        .container { position: relative; width: 100%; max-width: 800px; margin: 10px 0; }
+        #flash-container { width: 100%; padding-top: 75%; background-color: #000; position: relative; border-radius: 8px; overflow: hidden; transition: all 0.2s ease-in-out; }
+        #flash-container > ruffle-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .upload-area { padding: 20px; border: 2px dashed #ccc; border-radius: 8px; text-align: center; cursor: pointer; background-color: #fff; width: 100%; max-width: 800px; margin-bottom: 20px; }
+        #flash-container.zoomed-to-fit { position: fixed; top: 0; left: 0; right: 0; bottom: 0; margin: auto; z-index: 50; padding-top: 0; border-radius: 0; border: none; }
+        
+        .virtual-key-container { position: fixed; z-index: 100; bottom: 20px; }
+        .virtual-key-container.keys-hidden { display: none !important; }
+        #dpad-keys-container { left: 20px; display: grid; grid-template-areas: ". up ." "left down right"; gap: var(--key-gap); }
+        #numpad-keys-container { right: 20px; display: grid; grid-template-columns: repeat(3, var(--key-size)); gap: var(--key-gap); }
+        .virtual-key { width: var(--key-size); height: var(--key-size); background-color: rgba(80, 80, 80, 0.7); color: white; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; cursor: pointer; user-select: none; }
+        #key-up { grid-area: up; } #key-down { grid-area: down; } #key-left { grid-area: left; } #key-right { grid-area: right; }
+        
+        .controls { margin-bottom: 15px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .controls button { padding: 8px 15px; font-size: 14px; cursor: pointer; border: 1px solid #ccc; border-radius: 5px; background-color: #fff; }
+        
+        #key-config-controls { margin-bottom: 20px; padding: 15px; background-color: #fff; border: 1px solid #ddd; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        #key-config-controls h3 { margin-top: 0; text-align: center; margin-bottom: 15px;}
+        
+        #key-config-buttons-container { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
+        .config-group { display: grid; gap: 5px; }
+        #config-dpad { grid-template-areas: ". up ." "left down right"; }
+        #config-numpad { grid-template-columns: repeat(3, 1fr); }
+        #key-config-buttons-container button { width: 45px; height: 45px; padding: 0; font-size: 16px; display: flex; justify-content: center; align-items: center; border-radius: 5px; }
+        #config-dpad button[data-key-id='key-up'] { grid-area: up; } #config-dpad button[data-key-id='key-down'] { grid-area: down; } #config-dpad button[data-key-id='key-left'] { grid-area: left; } #config-dpad button[data-key-id='key-right'] { grid-area: right; }
+        
+        #fullscreen-stretch-btn { display: none; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: none; justify-content: center; align-items: center; }
+        #key-config-modal, #game-list-modal { z-index: 200; }
+        #dpad-preset-modal { z-index: 201; }
+        .modal-content { background-color: #f7f7f7; padding: 15px; border-radius: 12px; text-align: center; width: 90%; max-width: 320px; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content h3 { margin-top: 0; margin-bottom: 10px; }
+        
+        #key-selector-list, #game-list-container { background-color: #fff; border: 1px solid #ddd; border-radius: 8px; max-height: 50vh; overflow-y: auto; text-align: left; }
+        .key-category, .game-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .game-item:hover, .key-option:hover { background-color: #e8f4ff; }
+        .key-category { font-weight: bold; color: #555; font-size: 0.9em; position: sticky; top: 0; background-color: #efefef; }
+        .key-option .key-name { font-weight: bold; } .key-option .key-value { float: right; color: #888; }
+        .modal-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        
+        #toast-notification { position: fixed; bottom: 15%; left: 50%; transform: translateX(-50%); background-color: rgba(0, 0, 0, 0.75); color: white; padding: 10px 20px; border-radius: 20px; z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.5s, visibility 0.5s; text-align: center; pointer-events: none; }
+        #toast-notification.toast-visible { opacity: 1; visibility: visible; }
+    </style>
+</head>
+<body class="">
+    <div class="language-switcher" id="language-switcher">
+        <button data-lang="en">EN</button> <button data-lang="zh-TW">繁</button> <button data-lang="zh-CN">简</button> <button data-lang="ja">日</button>
+    </div>
+
+    <h1 data-i18n-key="pageTitle">Ruffle Flash Player</h1>
+    <div class="upload-area" id="upload-area">
+        <p data-i18n-key="uploadPrompt">Drag & Drop SWF File or Click to Select</p>
+        <input type="file" id="file-input" accept=".swf" style="display: none;">
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <!-- NEW: Load from Server Button -->
+            <button id="load-from-server-btn" data-i18n-key="btnLoadServer">Load from Site</button>
+            <button id="zoom-fit-btn" data-i18n-key="btnZoom">Maximize Window</button>
+            <button id="toggle-keys-btn"></button>
+        </div>
+        <div id="key-config-controls">
+            <h3 data-i18n-key="configTitle">Configure Key Functions</h3>
+            <div id="key-config-buttons-container"></div>
+        </div>
+        <div id="flash-container"></div>
+    </div>
+    
+    <div id="dpad-keys-container" class="virtual-key-container keys-hidden">
+        <div class="virtual-key" id="key-up">↑</div> <div class="virtual-key" id="key-down">↓</div> <div class="virtual-key" id="key-left">←</div> <div class="virtual-key" id="key-right">→</div>
+    </div>
+    <div id="numpad-keys-container" class="virtual-key-container keys-hidden">
+        <div class="virtual-key" id="key-pad-7"></div><div class="virtual-key" id="key-pad-8"></div><div class="virtual-key" id="key-pad-9"></div>
+        <div class="virtual-key" id="key-pad-4"></div><div class="virtual-key" id="key-pad-5"></div><div class="virtual-key" id="key-pad-6"></div>
+        <div class="virtual-key" id="key-pad-1"></div><div class="virtual-key" id="key-pad-2"></div><div class="virtual-key" id="key-pad-3"></div>
+    </div>
+
+    <div id="key-config-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="key-config-title" data-i18n-key="modalTitle">Select a Key</h3>
+            <div id="key-selector-list"></div>
+            <div class="modal-buttons">
+                <button id="dpad-preset-btn" data-i18n-key="btnDPadPreset">D-Pad Presets</button>
+                <button id="clear-key-btn" data-i18n-key="btnClear">Clear</button>
+                <button id="cancel-key-config-btn" data-i18n-key="btnExit">Exit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dpad-preset-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 data-i18n-key="presetModalTitle">Select D-Pad Preset</h3>
+            <div class="modal-buttons">
+                <button id="preset-arrows-btn" data-i18n-key="presetArrows">Set to ↑↓←→</button>
+                <button id="preset-wsad-btn" data-i18n-key="presetWSAD">Set to WSAD</button>
+                <button id="cancel-preset-btn" data-i18n-key="btnPresetCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NEW: Game List Modal -->
+    <div id="game-list-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 data-i18n-key="gameListTitle">Select a Game</h3>
+            <div id="game-list-container"></div>
+            <div class="modal-buttons">
+                <button id="cancel-game-list-btn" data-i18n-key="btnExit">Exit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-notification"></div>
+
+    <script>
+        window.RufflePlayer = window.RufflePlayer || {};
+        window.RufflePlayer.config = { "publicPath": "https://unpkg.com/@ruffle-rs/ruffle", "scale": "exactFit", "quality": "high" };
+
+        // --- IMPORTANT: Manually list your SWF files here ---
+        // Make sure these files are in the same directory as this HTML file on your server.
+        const GAME_FILES = [
+            '13929.swf',
+            'another_game.swf',
+            'example.swf'
+        ];
+
+        const translations = {
+            en: { pageTitle: "Ruffle Flash Player", uploadPrompt: "Drag & Drop SWF File or Click to Select", btnLoadServer: "Load from Site", btnZoom: "Maximize", btnZoomRestore: "Restore", btnToggleShow: "Expand Keys", btnToggleHide: "Collapse Keys", configTitle: "Configure Keys", modalTitle: "Select a Key", btnClear: "Clear", btnExit: "Exit", btnPresetCancel: "Cancel", alertNoSwf: "Load a SWF file first!", btnDPadPreset: "D-Pad Presets", presetModalTitle: "Select D-Pad Preset", presetArrows: "Set to ↑↓←→", presetWSAD: "Set to WSAD", toastExitZoom: "Press Esc or Back to exit.", gameListTitle: "Select a Game" },
+            'zh-TW': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或點擊選擇 SWF 檔案", btnLoadServer: "從網站載入遊戲", btnZoom: "視窗最大化", btnZoomRestore: "還原視窗", btnToggleShow: "展開按鍵", btnToggleHide: "收起按鍵", configTitle: "設定各按鍵功能", modalTitle: "選擇一個按鍵", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "請先載入一個 SWF 檔案！", btnDPadPreset: "方向鍵常用設定", presetModalTitle: "選擇方向鍵預設", presetArrows: "設定為 ↑↓←→", presetWSAD: "設定為 WSAD", toastExitZoom: "按 Esc 或返回鍵可退出最大化。", gameListTitle: "選擇一個遊戲" },
+            'zh-CN': { pageTitle: "Ruffle Flash 播放器", uploadPrompt: "拖拽或点击选择 SWF 文件", btnLoadServer: "从网站加载游戏", btnZoom: "窗口最大化", btnZoomRestore: "还原窗口", btnToggleShow: "展开按键", btnToggleHide: "收起按键", configTitle: "设置各按键功能", modalTitle: "选择一个按键", btnClear: "清除", btnExit: "退出", btnPresetCancel: "取消", alertNoSwf: "请先加载一个 SWF 文件！", btnDPadPreset: "方向键常用设置", presetModalTitle: "选择方向键预设", presetArrows: "设置为 ↑↓←→", presetWSAD: "设置为 WSAD", toastExitZoom: "按 Esc 或返回键可退出最大化。", gameListTitle: "选择一个游戏" },
+            ja: { pageTitle: "Ruffle Flash プレーヤー", uploadPrompt: "SWFファイルをドラッグ＆ドロップまたはクリックして選択", btnLoadServer: "サイトから読込", btnZoom: "ウィンドウ最大化", btnZoomRestore: "ウィンドウを元に戻す", btnToggleShow: "キーを展開", btnToggleHide: "キーを折りたたむ", configTitle: "各キーの機能を設定", modalTitle: "キーを選択", btnClear: "クリア", btnExit: "閉じる", btnPresetCancel: "キャンセル", alertNoSwf: "先にSWFファイルを読み込んでください！", btnDPadPreset: "方向キーのプリセット", presetModalTitle: "方向キーのプリセットを選択", presetArrows: "↑↓←→ に設定", presetWSAD: "WSAD に設定", toastExitZoom: "Escキーまたは戻るボタンで元に戻せます。", gameListTitle: "ゲームを選択" }
+        };
+        const KEY_LIST_I18N = {
+            en: { "Common Controls": [ { name: "Space", value: " " }, { name: "Enter", value: "Enter" }, { name: "Escape", value: "Escape" }, { name: "Shift", value: "Shift" }, { name: "Control", value: "Control" }, { name: "Alt", value: "Alt" } ], "Letters": "abcdefghijklmnopqrstuvwxyz".split('').map(k => ({ name: k.toUpperCase(), value: k })), "Numbers": "0123456789".split('').map(k => ({ name: k, value: k })), "Function Keys": Array.from({length: 12}, (_, i) => ({ name: `F${i+1}`, value: `F${i+1}` })), "Other": [ { name: "Tab", value: "Tab" }, { name: "Backspace", value: "Backspace" }, { name: "Insert", value: "Insert" } ] },
+            'zh-TW': { "常用控制": [ { name: "空白鍵", value: " " }, { name: "確認 / 換行", value: "Enter" }, { name: "跳脫", value: "Escape" }, { name: "位移", value: "Shift" }, { name: "控制", value: "Control" }, { name: "替代", value: "Alt" } ], "字母": "abcdefghijklmnopqrstuvwxyz".split('').map(k => ({ name: k.toUpperCase(), value: k })), "數字": "0123456789".split('').map(k => ({ name: k, value: k })), "功能鍵": Array.from({length: 12}, (_, i) => ({ name: `F${i+1}`, value: `F${i+1}` })), "其他": [ { name: "Tab", value: "Tab" }, { name: "刪除", value: "Backspace" }, { name: "插入", value: "Insert" } ] },
+            'zh-CN': { "常用控制": [ { name: "空格", value: " " }, { name: "确认 / 换行", value: "Enter" }, { name: "退出", value: "Escape" }, { name: "上档", value: "Shift" }, { name: "控制", value: "Control" }, { name: "交替", value: "Alt" } ], "字母": "abcdefghijklmnopqrstuvwxyz".split('').map(k => ({ name: k.toUpperCase(), value: k })), "数字": "0123456789".split('').map(k => ({ name: k, value: k })), "功能键": Array.from({length: 12}, (_, i) => ({ name: `F${i+1}`, value: `F${i+1}` })), "其他": [ { name: "Tab", value: "Tab" }, { name: "删除", value: "Backspace" }, { name: "插入", value: "Insert" } ] },
+            ja: { "共通コントロール": [ { name: "スペース", value: " " }, { name: "エンター", value: "Enter" }, { name: "エスケープ", value: "Escape" }, { name: "シフト", value: "Shift" }, { name: "コントロール", value: "Control" }, { name: "オルト", value: "Alt" } ], "文字": "abcdefghijklmnopqrstuvwxyz".split('').map(k => ({ name: k.toUpperCase(), value: k })), "数字": "0123456789".split('').map(k => ({ name: k, value: k })), "ファンクションキー": Array.from({length: 12}, (_, i) => ({ name: `F${i+1}`, value: `F${i+1}` })), "その他": [ { name: "Tab", value: "Tab" }, { name: "バックスペース", value: "Backspace" }, { name: "挿入", value: "Insert" } ] },
+        };
+        const allDOMElements = { body: document.body, langSwitcher: document.getElementById('language-switcher'), uploadArea: document.getElementById('upload-area'), fileInput: document.getElementById('file-input'), flashContainer: document.getElementById('flash-container'), dpadContainer: document.getElementById('dpad-keys-container'), numpadContainer: document.getElementById('numpad-keys-container'), zoomFitBtn: document.getElementById('zoom-fit-btn'), toggleKeysBtn: document.getElementById('toggle-keys-btn'), keyConfigButtonsContainer: document.getElementById('key-config-buttons-container'), keyConfigModal: document.getElementById('key-config-modal'), keySelectorList: document.getElementById('key-selector-list'), dpadPresetModal: document.getElementById('dpad-preset-modal'), dpadPresetBtn: document.getElementById('dpad-preset-btn'), presetArrowsBtn: document.getElementById('preset-arrows-btn'), presetWsadBtn: document.getElementById('preset-wsad-btn'), cancelPresetBtn: document.getElementById('cancel-preset-btn'), toastNotification: document.getElementById('toast-notification'), loadFromServerBtn: document.getElementById('load-from-server-btn'), gameListModal: document.getElementById('game-list-modal'), gameListContainer: document.getElementById('game-list-container'), cancelGameListBtn: document.getElementById('cancel-game-list-btn')};
+        
+        let rufflePlayer = null, isZoomed = false, currentConfigKeyId = null;
+        let areKeysVisible = false; let currentLanguage = 'en'; let keyMappings = {}; let toastTimer = null;
+        const defaultKeyMappings = { 'key-up': 'ArrowUp', 'key-down': 'ArrowDown', 'key-left': 'ArrowLeft', 'key-right': 'ArrowRight', 'key-pad-7': 'u', 'key-pad-8': 'i', 'key-pad-9': 'o', 'key-pad-4': 'j', 'key-pad-5': 'k', 'key-pad-6': 'l', 'key-pad-1': 'z', 'key-pad-2': 'x', 'key-pad-3': 'c' };
+
+        function setLanguage(lang) {
+            currentLanguage = lang; document.documentElement.lang = lang; localStorage.setItem('preferredLanguage', lang);
+            document.querySelectorAll('[data-i18n-key]').forEach(el => { const key = el.dataset.i18nKey; if (translations[lang][key]) el.textContent = translations[lang][key]; });
+            updateToggleKeysButtonText(); updateZoomFitButtonText();
+            document.querySelectorAll('.language-switcher button').forEach(btn => { btn.classList.toggle('active', btn.dataset.lang === lang); });
+            populateKeySelector();
+        }
+        function updateToggleKeysButtonText() { allDOMElements.toggleKeysBtn.textContent = areKeysVisible ? translations[currentLanguage].btnToggleHide : translations[currentLanguage].btnToggleShow; }
+        function updateZoomFitButtonText() { allDOMElements.zoomFitBtn.textContent = isZoomed ? translations[currentLanguage].btnZoomRestore : translations[currentLanguage].btnZoom; }
+        
+        function saveKeyMappings() { localStorage.setItem('ruffleKeyMappings', JSON.stringify(keyMappings)); }
+        function loadKeyMappings() { const saved = localStorage.getItem('ruffleKeyMappings'); keyMappings = saved ? JSON.parse(saved) : { ...defaultKeyMappings }; updateAllVirtualKeyText(); }
+        function updateVirtualKeyText(keyId) {
+            const keyElement = document.getElementById(keyId), configButton = document.querySelector(`[data-key-id="${keyId}"]`);
+            if (!keyElement) return; const mappedKey = keyMappings[keyId]; let displayText = '';
+            if (mappedKey) { const map = { 'ArrowUp': '↑', 'ArrowDown': '↓', 'ArrowLeft': '←', 'ArrowRight': '→', ' ': '␣', 'Enter': '↩' }; displayText = map[mappedKey] || (mappedKey.length > 1 ? mappedKey.substring(0, 2) : mappedKey); }
+            keyElement.textContent = displayText; if (configButton) configButton.textContent = keyElement.textContent;
+        }
+        function updateAllVirtualKeyText() { Object.keys(defaultKeyMappings).forEach(updateVirtualKeyText); }
+
+        async function createNewPlayer() {
+            if (rufflePlayer) rufflePlayer.remove();
+            const ruffle = window.RufflePlayer.newest();
+            rufflePlayer = ruffle.createPlayer();
+            allDOMElements.flashContainer.appendChild(rufflePlayer);
+        }
+
+        async function loadSWFFromData(data) {
+            await createNewPlayer();
+            try { await rufflePlayer.load({ data }); } 
+            catch (error) { console.error("Failed to load SWF:", error); alert(translations[currentLanguage].alertNoSwf); }
+        }
+
+        async function loadSWFFromServer(url) {
+            await createNewPlayer();
+            try { await rufflePlayer.load({ url }); }
+            catch (error) { console.error("Failed to load SWF from server:", error); alert(translations[currentLanguage].alertNoSwf); }
+        }
+
+        function handleKeyPress(e, eventType) { const keyElement = e.target.closest('.virtual-key'); if (keyElement && keyMappings[keyElement.id]) simulateKeyEvent(keyMappings[keyElement.id], eventType); }
+        function simulateKeyEvent(key, eventType) { if (!rufflePlayer) return; rufflePlayer.focus(); rufflePlayer.dispatchEvent(new KeyboardEvent(eventType, { key, code: key, bubbles: true, cancelable: true })); }
+        
+        function showToast(i18nKey) {
+            const toast = allDOMElements.toastNotification;
+            if (toastTimer) clearTimeout(toastTimer);
+            toast.textContent = translations[currentLanguage][i18nKey];
+            toast.classList.add('toast-visible');
+            toastTimer = setTimeout(() => { toast.classList.remove('toast-visible'); }, 3500);
+        }
+
+        function toggleZoomFit() {
+            isZoomed = !isZoomed;
+            if (isZoomed) {
+                const ratio = 4 / 3, vpW = window.innerWidth, vpH = window.innerHeight; let newW, newH;
+                if (vpW / vpH > ratio) { newH = vpH; newW = newH * ratio; } else { newW = vpW; newH = newW / ratio; }
+                allDOMElements.flashContainer.style.width = `${newW}px`; allDOMElements.flashContainer.style.height = `${newH}px`;
+                allDOMElements.flashContainer.classList.add('zoomed-to-fit'); allDOMElements.body.classList.add('zoomed-mode-active');
+                history.pushState({ zoom: true }, "Zoom Mode");
+                showToast('toastExitZoom');
+            } else {
+                allDOMElements.flashContainer.removeAttribute('style');
+                allDOMElements.flashContainer.classList.remove('zoomed-to-fit'); allDOMElements.body.classList.remove('zoomed-mode-active');
+                if (history.state?.zoom) history.back();
+            }
+            updateZoomFitButtonText();
+        }
+        
+        function applyDPadPreset(type) {
+            if (type === 'arrows') { keyMappings['key-up'] = 'ArrowUp'; keyMappings['key-down'] = 'ArrowDown'; keyMappings['key-left'] = 'ArrowLeft'; keyMappings['key-right'] = 'ArrowRight'; } 
+            else if (type === 'wsad') { keyMappings['key-up'] = 'w'; keyMappings['key-down'] = 's'; keyMappings['key-left'] = 'a'; keyMappings['key-right'] = 'd'; }
+            saveKeyMappings(); updateAllVirtualKeyText();
+            allDOMElements.dpadPresetModal.style.display = 'none'; allDOMElements.keyConfigModal.style.display = 'none';
+        }
+        
+        function initialize() {
+            createConfigButtons(); loadKeyMappings(); populateGameList();
+            const preferredLang = localStorage.getItem('preferredLanguage') || 'en';
+            setLanguage(preferredLang);
+        }
+        function createConfigButtons() {
+            const container = allDOMElements.keyConfigButtonsContainer; container.innerHTML = '';
+            const dpadGroup = document.createElement('div'); dpadGroup.id = 'config-dpad'; dpadGroup.className = 'config-group';
+            const numpadGroup = document.createElement('div'); numpadGroup.id = 'config-numpad'; numpadGroup.className = 'config-group';
+            ['key-up', 'key-down', 'key-left', 'key-right'].forEach(keyId => { const btn = document.createElement('button'); btn.dataset.keyId = keyId; dpadGroup.appendChild(btn); });
+            ['key-pad-7', 'key-pad-8', 'key-pad-9', 'key-pad-4', 'key-pad-5', 'key-pad-6', 'key-pad-1', 'key-pad-2', 'key-pad-3'].forEach(keyId => { const btn = document.createElement('button'); btn.dataset.keyId = keyId; numpadGroup.appendChild(btn); });
+            container.appendChild(dpadGroup); container.appendChild(numpadGroup);
+        }
+        function populateKeySelector() {
+            allDOMElements.keySelectorList.innerHTML = '';
+            const currentKeyList = KEY_LIST_I18N[currentLanguage];
+            Object.entries(currentKeyList).forEach(([category, keys]) => {
+                const catDiv = document.createElement('div'); catDiv.className = 'key-category'; catDiv.textContent = category;
+                allDOMElements.keySelectorList.appendChild(catDiv);
+                keys.forEach(key => {
+                    const optDiv = document.createElement('div'); optDiv.className = 'key-option'; optDiv.dataset.key = key.value;
+                    optDiv.innerHTML = `<span class="key-name">${key.name}</span><span class="key-value">${key.value}</span>`;
+                    allDOMElements.keySelectorList.appendChild(optDiv);
+                });
+            });
+        }
+        function populateGameList() {
+            const container = allDOMElements.gameListContainer;
+            container.innerHTML = '';
+            GAME_FILES.forEach(filename => {
+                const item = document.createElement('div');
+                item.className = 'game-item';
+                item.textContent = filename;
+                item.dataset.filename = filename;
+                container.appendChild(item);
+            });
+        }
+
+        allDOMElements.uploadArea.addEventListener('click', () => allDOMElements.fileInput.click());
+        allDOMElements.fileInput.addEventListener('change', () => {
+            if (allDOMElements.fileInput.files.length) {
+                const reader = new FileReader();
+                reader.onload = (e) => loadSWFFromData(e.target.result);
+                reader.readAsArrayBuffer(allDOMElements.fileInput.files[0]);
+            }
+        });
+        ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+            allDOMElements.uploadArea.addEventListener(eventName, e => {
+                e.preventDefault();
+                if (eventName === 'drop' && e.dataTransfer.files.length) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => loadSWFFromData(e.target.result);
+                    reader.readAsArrayBuffer(e.dataTransfer.files[0]);
+                }
+            });
+        });
+        
+        document.querySelectorAll('.virtual-key').forEach(key => { ['mousedown', 'touchstart'].forEach(evt => key.addEventListener(evt, e => { e.preventDefault(); handleKeyPress(e, 'keydown'); }, { passive: false })); ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(evt => key.addEventListener(evt, e => { e.preventDefault(); handleKeyPress(e, 'keyup'); }, { passive: false })); });
+        
+        allDOMElements.langSwitcher.addEventListener('click', e => { if (e.target.dataset.lang) setLanguage(e.target.dataset.lang); });
+        allDOMElements.zoomFitBtn.addEventListener('click', toggleZoomFit);
+        allDOMElements.toggleKeysBtn.addEventListener('click', () => { areKeysVisible = !areKeysVisible; allDOMElements.dpadContainer.classList.toggle('keys-hidden', !areKeysVisible); allDOMElements.numpadContainer.classList.toggle('keys-hidden', !areKeysVisible); updateToggleKeysButtonText(); });
+        
+        allDOMElements.keyConfigButtonsContainer.addEventListener('click', e => { const btn = e.target.closest('button'); if (btn && btn.dataset.keyId) { currentConfigKeyId = btn.dataset.keyId; allDOMElements.keyConfigModal.style.display = 'flex'; } });
+        allDOMElements.keySelectorList.addEventListener('click', e => { const opt = e.target.closest('.key-option'); if (opt && currentConfigKeyId) { keyMappings[currentConfigKeyId] = opt.dataset.key; saveKeyMappings(); updateVirtualKeyText(currentConfigKeyId); allDOMElements.keyConfigModal.style.display = 'none'; } });
+        document.getElementById('clear-key-btn').addEventListener('click', () => { if (currentConfigKeyId) { keyMappings[currentConfigKeyId] = null; saveKeyMappings(); updateVirtualKeyText(currentConfigKeyId); } allDOMElements.keyConfigModal.style.display = 'none'; });
+        document.getElementById('cancel-key-config-btn').addEventListener('click', () => allDOMElements.keyConfigModal.style.display = 'none');
+        
+        allDOMElements.dpadPresetBtn.addEventListener('click', () => { allDOMElements.dpadPresetModal.style.display = 'flex'; });
+        allDOMElements.presetArrowsBtn.addEventListener('click', () => applyDPadPreset('arrows'));
+        allDOMElements.presetWsadBtn.addEventListener('click', () => applyDPadPreset('wsad'));
+        allDOMElements.cancelPresetBtn.addEventListener('click', () => { allDOMElements.dpadPresetModal.style.display = 'none'; });
+
+        allDOMElements.loadFromServerBtn.addEventListener('click', () => { allDOMElements.gameListModal.style.display = 'flex'; });
+        allDOMElements.cancelGameListBtn.addEventListener('click', () => { allDOMElements.gameListModal.style.display = 'none'; });
+        allDOMElements.gameListContainer.addEventListener('click', e => {
+            if(e.target.classList.contains('game-item')) {
+                const filename = e.target.dataset.filename;
+                loadSWFFromServer(filename);
+                allDOMElements.gameListModal.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('keydown', e => { if (e.key === 'Escape' && isZoomed) toggleZoomFit(); });
+        window.addEventListener('popstate', () => { if (document.fullscreenElement) document.exitFullscreen(); if (isZoomed) toggleZoomFit(); });
+        
+        initialize();
+    </script>
+</body>
+</html>
